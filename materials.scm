@@ -350,3 +350,18 @@
 		     (E-susceptibilities (append AlN-susc-o AlN-susc-e))))
 
 ;------------------------------------------------------------------
+; silicon carbide (SiC) from S. Singh, J. R. Potopowicz, L. G. Van Uitert and S. H. Wemple.  Appl. Phys. Lett. 19, 53 1971
+; ref: https://refractiveindex.info/?shelf=main&book=SiC&page=Singh-o
+; α-SiC; 
+;wavelength range: 0.488-1.064 µm
+
+(define SiC-frq1 (/ (* 0.026945 um-scale)))
+(define SiC-gam1 0)	
+(define SiC-sig1 5.5394)	
+
+(define A-SiC (make medium (epsilon 9.28156)
+ (E-susceptibilities 
+  (make lorentzian-susceptibility
+    (frequency Si-frq1) (gamma Si-gam1) (sigma Si-sig1)))))	
+	
+;------------------------------------------------------------------
