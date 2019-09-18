@@ -85,9 +85,22 @@
 		     (E-susceptibilities (append SiO2-susc-o SiO2-susc-e))))
 
 ;----------------------------structure---------------------------------
-(define-param sx 16) ; size of cell in X direction
-(define-param sy 16) ; size of cell in Y direction
-(define-param sz 22) ; size of cell in Z direction
+(define-param dpml 0.2)                  ; thickness of PML layers
+(define-param fcen 0.3)                  ; pulse center frequency
+(define-param df 0.3)                    ; turn-on bandwidth
+(define-param nfreq 20)
+(define-param sample 10)
+(define-param decayby 1e-8)
+
+(define-param sx 16)                     ; size of cell in X direction
+(define-param sy 16)                     ; size of cell in Y direction
+(define-param sz 22)                     ; size of cell in Z direction
+
+(define sx0 (+ sx (* 2 dpml)))           ; refer to the powerpoint slide
+(define sy0 (+ sy (* 2 dpml)))           ; refer to the powerpoint slide
+(define sz0 (+ sz (* 2 dpml)))           ; refer to the powerpoint slide
+
+
 (define a 1e-6)                                                                                  ;length unit used in simulation = 1 micron
 (set! resolution 40)                                                                             ;pixels/μm
 (set! geometry-lattice (make lattice (size sx sy sz)))                                               
@@ -110,14 +123,127 @@
 
 (set! sources (list 
         (make source 
-		  (src (make continuous-src (wavelength (1.5)) (width 20))) 
-		  (component Ez) 
-		  (center 0 0 12)
+		  (src (make gaussian-src (frequency fcen) (fwidth df)))
+                  (component Hz) 
+		  (center 0 0 10)
 		  (size sx sy))))
 
 (set! pml-layers (list 
-        (make pml (thickness 0.2))))
+       (make pml (thickness dpml) (direction X))
+       (make pml (thickness dpml) (direction Y))
+       (make pml (thickness dpml) (direction Z)))) 
+       
+; Define a monitor half the size
+(define monitor-xy
+   (volume 
+   (center 0 0 0)(size sx sy 0)))
+
+(define monitor-xz
+   (volume 
+   (center 0 0 0)(size sx 0 sz)))
+   
+(if (not structure?)
+(define incident; transmitted flux  for calculating source power                                              
+      (add-flux fcen df nfreq
+                    (make flux-region
+                    (center 0 0 -0.7) (size sx sy 0) ))))
+
+(define left                                       
+      (add-flux fcen df nfreq
+                    (make flux-region
+                    (center -8  0 0) (size 0 sy sz) )))
+
+(define right                                                
+      (add-flux fcen df nfreq
+                    (make flux-region
+                    (center  8  0 0) (size 0 sy sz) )))
+
+(define bottom                                                
+      (add-flux fcen df nfreq
+                    (make flux-region
+                    (center 0 0 -2) (size sx sy 0) )))
+
+(define top                                                
+      (add-flux fcen df nfreq
+                    (make flux-region
+                    (center 0 0 12) (size  sx  sy 0) )))
+
+(define back                                                
+      (add-flux fcen df nfreq
+                    (make flux-region
+                    (center 0 0 -12) (size sx  sy 0) )))
 
 
-(run-until 200 
-          (at-beginning output-epsilon) (to-appended "ez" (at-every 0.6 output-efield-z)))
+(define front                                                
+      (add-flux fcen df nfreq
+                    (make flux-region
+                    (center 0 0 12 ) (size sx  sy 0) )))
+   
+
+if scattering?
+;if scattering? is true, do the following
+(list 
+	(if structure? 
+		(list 
+		(load-minus-flux "left_flux" left) 
+		(load-minus-flux "right_flux" right) 
+		(load-minus-flux "top_flux" top) 
+		(load-minus-flux "bottom_flux" bottom) 
+		(load-minus-flux "front_flux" front) 
+		(load-minus-flux "back_flux" back))
+	)
+	
+	(if (not structure?)
+		(run-sources+	(stop-when-fields-decayed 1 Ex (vector3 0 sy 0) decayby)
+			(in-volume monitor-xz (to-appended "bEx_xz" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-x)))
+			(in-volume monitor-xz (to-appended "bEy_xz" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-y)))
+			(in-volume monitor-xz (to-appended "bEz_xz" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-z)))
+			
+			(in-volume monitor-xy (to-appended "bEx_xy" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-x)))
+			(in-volume monitor-xy (to-appended "bEy_xy" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-y)))
+			(in-volume monitor-xy (to-appended "bEz_xy" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-z)))
+
+		)	
+	)
+
+	(if structure?
+	(run-sources+	(stop-when-fields-decayed 1 Ex (vector3 0 sy 0) decayby)
+	)
+	)
+	
+	(if (not structure?) 
+		(list 
+			(save-flux "left_flux" left) 
+			(save-flux "right_flux" right)
+			(save-flux "top_flux" top)
+			(save-flux "bottom_flux" bottom) 
+			(save-flux "front_flux" front)
+			(save-flux "back_flux" back)) 
+	)
+
+	(if (not structure?) (display-fluxes incident))
+
+	(if structure? (display-fluxes left right bottom top back front))
+)
+;if scattering? is false, do the following
+(list 
+	(run-sources+	(stop-when-fields-decayed 1 Ex (vector3 0 sy 0) decayby)
+		(in-volume monitor-xy (at-beginning output-epsilon))
+		(in-volume monitor-xz (to-appended "sEx_xz" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-x)))
+		(in-volume monitor-xz (to-appended "sEy_xz" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-y)))
+		(in-volume monitor-xz (to-appended "sEz_xz" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-z)))
+
+		(in-volume monitor-xz (at-beginning output-epsilon))
+		(in-volume monitor-xy (to-appended "sEx_xy" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-x)))
+		(in-volume monitor-xy (to-appended "sEy_xy" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-y)))
+		(in-volume monitor-xy (to-appended "sEz_xy" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-z)))
+	)
+	(if structure? (display-fluxes left right bottom top back front))
+	)
+
+)
+
+
+;(run-until 200
+;(in-volume monitor (to-appended "Ex" (at-every (/ 1 (+ fcen (* 0.5 df)) sample) output-efield-x)))
+;)
