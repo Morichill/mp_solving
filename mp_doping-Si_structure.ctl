@@ -85,16 +85,19 @@
 		     (E-susceptibilities (append SiO2-susc-o SiO2-susc-e))))
 
 ;----------------------------structure---------------------------------
+(define-param sx 16) ; size of cell in X direction
+(define-param sy 16) ; size of cell in Y direction
+(define-param sz 22) ; size of cell in Z direction
 (define a 1e-6)                                                                                  ;length unit used in simulation = 1 micron
 (set! resolution 40)                                                                             ;pixels/μm
-(set! geometry-lattice (make lattice (size 16 16 22)))                                               
+(set! geometry-lattice (make lattice (size sx sy sz)))                                               
 (set! geometry (list
-         (make block (center 0 0 0) (size 16 16 0.6) 
+         (make block (center 0 0 0) (size sx sy 0.6) 
 		        (material SiO2-aniso) )                                                              ; SiO2-lib
-		 (make block (center 0 0 -0.4) (size 16 16 0.4)
+		 (make block (center 0 0 -0.4) (size sx sy 0.4)
         		(material Si3N4-NIR) )                                                               ; Si3N4-NIR-lib
-		 (make block (center 0 0 -10.4) (size 16 16 10) 
-		        (material Si) )                                                                      ; Si-lib
+		 (make block (center 0 0 -10.4) (size sx sy 10) 
+		        (material Si) )                                                                      ; substrate-Si-lib
 		 (make block (center -8 -8 0.6) (size 3 3 1) 
 		        (material (make dielectric (epsilon 12))) )                                          ; Atention! Make  material - doping Si
 		 (make block (center 0 -8 0.6) (size 3 3 1) 
@@ -110,10 +113,10 @@
 		  (src (make continuous-src (wavelength (1.5)) (width 20))) 
 		  (component Ez) 
 		  (center 0 0 12)
-		  (size 16 16))))
+		  (size sx sy))))
 
 (set! pml-layers (list 
-        (make pml (thickness 1.0))));5)
+        (make pml (thickness 1.0))))
 
 
 (run-until 200 
