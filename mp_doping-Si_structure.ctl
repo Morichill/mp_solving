@@ -116,7 +116,7 @@
 		  (size sx sy))))
 
 (set! pml-layers (list 
-        (make pml (thickness 1.0))))
+        (make pml (thickness 0.2))))
 
 
 (run-until 200 
